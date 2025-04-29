@@ -8,13 +8,12 @@ brain=Brain()
 # CONNECT TO PORTS
 left_motor = Motor(Ports.PORT1, 18_1, False)
 right_motor = Motor(Ports.PORT10, 18_1, True)
-ai_vision_2__ORANGE = Colordesc(1, 243, 105, 94, 10, 0.2)
 camera_motor = Motor(Ports.PORT3, 18_1, False)
 claw_motor = Motor(Ports.PORT11, 18_1, True)
 
-ai_vision_2__YELLOW = Colordesc(2, 231, 163, 92, 10, 0.2)
-ai_vision_2__GREEN = Colordesc(3, 24, 202, 84, 10, 0.2)
-# AI Vision Code Descriptions
+ai_vision_2__ORANGE = Colordesc(1, 243, 105, 94, 10, 0.34)
+ai_vision_2__YELLOW = Colordesc(2, 231, 163, 92, 12, 0.45)
+ai_vision_2__GREEN = Colordesc(3, 24, 202, 84, 10, 0.7)
 ai_vision_2 = AiVision(Ports.PORT20, ai_vision_2__ORANGE, ai_vision_2__YELLOW, ai_vision_2__GREEN)
 
 rangeFinderFront = Sonar(brain.three_wire_port.e)
@@ -120,27 +119,28 @@ def turn_still(degrees):
 def close_claw():
     claw_move(FORWARD, 0.19)
     
-def DetectObject(color=ai_vision_2__ORANGE):
+def DetectObject(color):
   objects = ai_vision_2.take_snapshot(color)
   if (objects):
-    print(ai_vision_2.largest_object().centerX)
     return [ai_vision_2.largest_object().height, ai_vision_2.largest_object().centerX, ai_vision_2.largest_object().centerY]
   return [None, None, None]
 
 def SetDistanceAway(setWidth, width, setLeft, left):
   to_left = setLeft - left
   to_target = setWidth - width
-  velocity = 10
-  left_motor.set_velocity(to_target * velocity + to_left * 5)
-  right_motor.set_velocity(to_target * velocity - to_left * 5)
+  velocity = 3
+  k_p = 1
+  left_motor.set_velocity(to_target * velocity + to_left * k_p)
+  right_motor.set_velocity(to_target * velocity - to_left * k_p)
 
 def SetCameraHeight(setHeight, top):
   to_top = setHeight - top
   camera_motor.set_velocity(to_top)
 
 def SetRotation(setLeft, left):
+    print("LEFT: " + str(left) + " SET LEFT: " + str(setLeft))
     to_left = setLeft - left
-    speed = 1
+    speed = .1
     left_motor.set_velocity(to_left * speed)
     right_motor.set_velocity(-to_left * speed)
 
@@ -148,9 +148,9 @@ def follow_color(color):
     left_motor.spin(FORWARD, False)
     right_motor.spin(FORWARD, False)
     camera_motor.spin(FORWARD, False)
-    MAX_DISTANCE = 190
-    ERROR = 1
-    CAMERA_HEIGHT = 122
+    MAX_DISTANCE = 180
+    ERROR = 10
+    CAMERA_HEIGHT = 115
 
 
     # first, our program move the camera up until it's at the right y height and rotates the robot so it's the right x value
@@ -159,6 +159,8 @@ def follow_color(color):
     # set camera height
     while True:
         [height, left, top] = DetectObject(color)
+
+        print(CAMERA_HEIGHT - top if top is not None else 0)
 
         if(top == None):
             left_motor.set_velocity(0, RPM)
@@ -183,7 +185,7 @@ def follow_color(color):
             right_motor.set_velocity(0, RPM)
             camera_motor.set_velocity(0, RPM)
 
-        if(isinstance(left, int) and left == 304/2):
+        if(isinstance(left, int) and left < 304/2 + ERROR and left > 304/2 - ERROR):
             left_motor.set_velocity(0, RPM)
             right_motor.set_velocity(0, RPM)
             camera_motor.set_velocity(0, RPM)
@@ -199,7 +201,7 @@ def follow_color(color):
     while True:
         [height, left, top] = DetectObject(color)
 
-        if(height != None and height > 100):
+        if(height is not None and height > 100):
             if(height > max_height):
                 max_height = height
                 print("MAX HEIGHT: " + str(max_height))
@@ -331,12 +333,17 @@ def dead_reconning_to_beginning():
 
 # dead_reconning_to_beginning()
 
-get_fruit_and_drop_into_box(ai_vision_2__ORANGE)
 
-# print("Starting program...")
+print("Starting program...")
+
+raise_camera()
+follow_color(ai_vision_2__GREEN)
+close_claw()
+move_robot_forwards(-12)
+
 # get_up_ramp()
 # while True:
 #     get_fruit_and_drop_into_box(ai_vision_2__GREEN)
-#     get_fruit_and_drop_into_box(ai_vision_2__ORANGE)
-#     get_fruit_and_drop_into_box(ai_vision_2__YELLOW)
-#     dead_reconning_to_beginning()
+    # get_fruit_and_drop_into_box(ai_vision_2__ORANGE)
+    # get_fruit_and_drop_into_box(ai_vision_2__YELLOW)
+    # dead_reconning_to_beginning()
