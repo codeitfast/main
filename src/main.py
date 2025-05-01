@@ -1,6 +1,7 @@
 # Library imports
 from vex import *
 from time import sleep
+import time
 
 
 brain=Brain()
@@ -12,11 +13,11 @@ camera_motor = Motor(Ports.PORT3, 18_1, False)
 claw_motor = Motor(Ports.PORT11, 18_1, True)
 
 ai_vision_2__ORANGE = Colordesc(1, 243, 105, 94, 10, 0.34)
-ai_vision_2__YELLOW = Colordesc(2, 231, 163, 92, 12, 0.45)
+ai_vision_2__YELLOW = Colordesc(2, 231, 163, 92, 12, 0.1)
 ai_vision_2__GREEN = Colordesc(3, 24, 202, 84, 10, 0.7)
 ai_vision_2 = AiVision(Ports.PORT20, ai_vision_2__ORANGE, ai_vision_2__YELLOW, ai_vision_2__GREEN)
 
-rangeFinderFront = Sonar(brain.three_wire_port.e)
+rangeFinderFront = Sonar(brain.three_wire_port.g)
 line_sensor_left = Line(brain.three_wire_port.b)
 line_sensor_right = Line(brain.three_wire_port.a)
 
@@ -43,7 +44,7 @@ camera_motor.reset_position()
 WHEEL_DIAMETER = 4.0
 GEAR_RATIO = 5.0
 WHEEL_TRACK = 11.0 
-K_P = 0.8
+K_P = 4
 D_P = 0.8
 SET_WALL_FOLLOW_SPEED = 150         # RPM
 SET_DISTANCE_TO_START_TURN = 3      # inches from wall in front to begin turn
@@ -66,6 +67,14 @@ def follow_line():
     # difference in reflectivity between the two sensors
     diff = line_sensor_left.reflectivity() - line_sensor_right.reflectivity()
     drive(SET_WALL_FOLLOW_SPEED, -K_P*diff)
+    return line_exists()
+
+def follow_line_backwards():
+    "Function to follow a line using two line sensors."
+
+    # difference in reflectivity between the two sensors
+    diff = line_sensor_left.reflectivity() - line_sensor_right.reflectivity()
+    drive(-SET_WALL_FOLLOW_SPEED, K_P*diff)
     return line_exists()
 
 def line_exists(cutoff=8):
@@ -101,7 +110,7 @@ def move_forwards_until_touching_box():
     pass
 
 def open_claw():
-    claw_move(REVERSE, 0.5)
+    claw_move(REVERSE, 0.1)
 
 def move_backwards():
     pass
@@ -110,7 +119,7 @@ def raise_camera():
     camera_motor.spin_for(FORWARD, 700)
 
 def lower_camera():
-    camera_motor.spin_for(REVERSE, 250)
+    camera_motor.spin_for(REVERSE, 500)
 
 def turn_still(degrees):
     left_motor.spin_for(REVERSE, degrees*GEAR_RATIO*WHEEL_TRACK/WHEEL_DIAMETER, DEGREES, 100, RPM, False)
@@ -138,9 +147,8 @@ def SetCameraHeight(setHeight, top):
   camera_motor.set_velocity(to_top)
 
 def SetRotation(setLeft, left):
-    print("LEFT: " + str(left) + " SET LEFT: " + str(setLeft))
     to_left = setLeft - left
-    speed = .1
+    speed = 0.5
     left_motor.set_velocity(to_left * speed)
     right_motor.set_velocity(-to_left * speed)
 
@@ -150,7 +158,7 @@ def follow_color(color):
     camera_motor.spin(FORWARD, False)
     MAX_DISTANCE = 180
     ERROR = 10
-    CAMERA_HEIGHT = 115
+    CAMERA_HEIGHT = 122
 
 
     # first, our program move the camera up until it's at the right y height and rotates the robot so it's the right x value
@@ -159,8 +167,6 @@ def follow_color(color):
     # set camera height
     while True:
         [height, left, top] = DetectObject(color)
-
-        print(CAMERA_HEIGHT - top if top is not None else 0)
 
         if(top == None):
             left_motor.set_velocity(0, RPM)
@@ -204,7 +210,6 @@ def follow_color(color):
         if(height is not None and height > 100):
             if(height > max_height):
                 max_height = height
-                print("MAX HEIGHT: " + str(max_height))
 
         if(isinstance(height, int) and height > MAX_DISTANCE):
             stop_robot()
@@ -217,7 +222,7 @@ def follow_color(color):
 
         camera_motor.set_velocity(0, RPM)
 
-    move_robot_forwards(3)
+    move_robot_forwards(3.5)
 
 def claw_move(direction, threshold=2.0):
     claw_motor.spin(direction)
@@ -225,11 +230,10 @@ def claw_move(direction, threshold=2.0):
 
     while True:
         current_torque = claw_motor.torque(TorqueUnits.NM)
-        print("Current torque: " + str(current_torque))
         if current_torque >= threshold:
             claw_motor.set_stopping(BRAKE)
             break
-        wait(5, TimeUnits.MSEC)
+        sleep(5/1000)
 
 def drop_off_the_fruit():
     follow_april_tag()
@@ -246,53 +250,56 @@ def get_up_ramp():
     while line_exists:
         line_exists = follow_line()
     
-    move_robot_forwards(12)
+    move_robot_forwards(24)
 
     # turn left 90 degrees
     turn_still(-90)
 
 def get_onto_line():
     # move forwards a foot to get away from the ramp
-    move_robot_forwards(12)
 
-    print(line_exists())
-    print(line_sensor_left.reflectivity(), line_sensor_right.reflectivity())
-
-    correction = 15
+    correction = 30
 
     # until we see a line, keep moving forwards with the right motor slightly faster than the left motor
-    while not line_exists(cutoff=15):
+    while (not line_exists(cutoff=15)) or (line_sensor_left.reflectivity() == 100 or line_sensor_right.reflectivity() == 100):
         left_motor.set_velocity(SET_WALL_FOLLOW_SPEED + correction, RPM)
         right_motor.set_velocity(SET_WALL_FOLLOW_SPEED - correction, RPM)
         left_motor.spin(FORWARD)
         right_motor.spin(FORWARD)
+
     
+    move_robot_forwards(10)
+    turn_still(60)
+
     # stop the robot
     stop_robot()
 
-def get_to_box():
-    while rangeFinderFront.distance(DistanceUnits.IN) != 0 or rangeFinderFront.distance(DistanceUnits.IN) > 4:
-        print("DISTANCE: " + str(rangeFinderFront.distance(DistanceUnits.IN)))
-        follow_line()
-        if(rangeFinderFront.distance(DistanceUnits.IN) < 4 and rangeFinderFront.distance(DistanceUnits.IN) > 1):
-            break
+    sleep(1)
 
-    print("STOPPING")
+def get_to_box():
+    while rangeFinderFront.distance(DistanceUnits.IN) == 0 or rangeFinderFront.distance(DistanceUnits.IN) > 4:
+        follow_line()
+
     left_motor.set_velocity(0, RPM)
     right_motor.set_velocity(0, RPM)
 
 def drop_fruit():
     lower_camera()
+    
     open_claw()
 
-    move_robot_forwards(-6)
-    turn_still(180)
+    sleep(1)
+
+    move_robot_forwards(-2)
+    turn_still(120)
 
 def turn_to_line():
+    turn_speed = 20
+
     # turn to the left until we see a line
     while not line_exists(cutoff=15):
         left_motor.set_velocity(SET_WALL_FOLLOW_SPEED, RPM)
-        right_motor.set_velocity(-SET_WALL_FOLLOW_SPEED, RPM)
+        right_motor.set_velocity(SET_WALL_FOLLOW_SPEED + turn_speed, RPM)
         left_motor.spin(FORWARD)
         right_motor.spin(FORWARD)
 
@@ -301,49 +308,50 @@ def turn_to_line():
 
 def get_fruit_and_drop_into_box(color):
     raise_camera()
-    # open_claw()
+    open_claw()
     follow_color(color)
     close_claw()
     sleep(1) # I don't like this, but for some reason close claw runs asynchronously?
-    move_robot_forwards(-12)
-    # turn_still(-45)
-    turn_to_line() #test line
-    lower_camera() # TODO: LOWER UNTIL TOUCHING GROUND, TORQUE > 0.1
-    print("GETTING ONTO LINE")
+    move_robot_forwards(-15)
     get_onto_line()
-    print("GETTING TO BOX")
     get_to_box()
-    print("DROPPING FRUIT")
     drop_fruit()
+
+
 
 def dead_reconning_to_beginning():
 
     drive(100, 0)
 
     while True:
-        print(line_sensor_left.reflectivity(), line_sensor_right.reflectivity())
         if line_exists() and line_sensor_left.reflectivity() != 100 and line_sensor_right.reflectivity() != 100:
             break
-        wait(10, TimeUnits.MSEC)
+        sleep(10/1000)
 
     stop_robot()
-    wait(100, TimeUnits.MSEC)
+    sleep(100/1000)
     turn_still(180)
 
 
-# dead_reconning_to_beginning()
+# drop_fruit()
+# get_onto_line() # maybe we should recenter it on the line?
 
+# # follow line for 3 seconds
+# start_time = time.time()
+# while time.time() - start_time < 4:
+#     follow_line()
+#     sleep(10/1000)
 
-print("Starting program...")
+# move_robot_forwards(12 * -3)
+# stop_robot()
 
-raise_camera()
-follow_color(ai_vision_2__GREEN)
-close_claw()
-move_robot_forwards(-12)
+get_up_ramp()
+get_fruit_and_drop_into_box(ai_vision_2__GREEN)
+get_fruit_and_drop_into_box(ai_vision_2__ORANGE)
 
 # get_up_ramp()
 # while True:
 #     get_fruit_and_drop_into_box(ai_vision_2__GREEN)
-    # get_fruit_and_drop_into_box(ai_vision_2__ORANGE)
-    # get_fruit_and_drop_into_box(ai_vision_2__YELLOW)
-    # dead_reconning_to_beginning()
+#     get_fruit_and_drop_into_box(ai_vision_2__ORANGE)
+#     get_fruit_and_drop_into_box(ai_vision_2__YELLOW)
+#     dead_reconning_to_beginning()
