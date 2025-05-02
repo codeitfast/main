@@ -171,9 +171,9 @@ def follow_color(color):
     left_motor.spin(FORWARD, False)
     right_motor.spin(FORWARD, False)
     camera_motor.spin(FORWARD, False)
-    MAX_DISTANCE = 150
+    MAX_DISTANCE = 180
     ERROR = 10
-    CAMERA_HEIGHT = 100
+    CAMERA_HEIGHT = 120
 
 
     # first, our program move the camera up until it's at the right y height and rotates the robot so it's the right x value
@@ -237,7 +237,7 @@ def follow_color(color):
 
         camera_motor.set_velocity(0, RPM)
 
-    move_robot_forwards(1)
+    move_robot_forwards(2)
 
 def claw_move(direction, threshold=2.0):
     claw_motor.spin(direction)
@@ -273,7 +273,7 @@ def get_up_ramp():
 def get_onto_line(right):
     # move forwards a foot to get away from the ramp
 
-    correction = 30
+    correction = 40
     if right == False:
         correction *= -1
 
@@ -362,8 +362,10 @@ def get_fruit_and_drop_into_box(color, right):
         turn_still(30)
     
     lower_camera()
-    # sleep(1)
-    # drop_fruit()
+
+    drop_fruit()
+
+    sleep(1)
 
 
 
@@ -463,16 +465,13 @@ get_up_ramp()
 raise_camera()
 while True:
     get_fruit_and_drop_into_box(ai_vision_2__GREEN, True)
-    move_robot_forwards(12)
+    turn_still(90)
     get_fruit_and_drop_into_box(ai_vision_2__ORANGE, True)
-    get_onto_line(True)
-
-    turn_still(60)
-    move_robot_forwards(6)
-
+    turn_still(90)
+    move_robot_forwards(20)
     get_fruit_and_drop_into_box(ai_vision_2__YELLOW, True)
 
-    turn_still(90)
+    turn_still(360)
     left_motor.spin(FORWARD)
     right_motor.spin(FORWARD)
 
